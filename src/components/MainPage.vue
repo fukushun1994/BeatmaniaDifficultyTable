@@ -11,6 +11,8 @@
       <li v-for="item in by_difficulty[difficulty]"
         class="item"
         :key="item.id"
+        :class="[hard_status[item.id] ? 'hard' : 'non-hard']"
+        @click="itemClicked(item)"
       >
         <p>{{ item.name }}</p>
       </li>
@@ -41,7 +43,8 @@ export default {
         '地力E',
         '地力F',
         '未定'
-      ]
+      ],
+      hard_status: {}
     }
   },
   mounted () {
@@ -65,17 +68,28 @@ export default {
             textage_2P: 'http://textage.cc/score/25/citynvrs.html?2AB00',
             version: '25'
           }
-        ]
-        */
-        console.log(data)
+        ]*/
+        
         for (var d of data) {
           if (!this.by_difficulty[d.difficulty]) {
             this.$set(this.by_difficulty, d.difficulty, [])
           }
           this.by_difficulty[d.difficulty].push(d)
+          let hard_flag = localStorage.getItem(d.id)
+          if (hard_flag != null) {
+            this.$set(this.hard_status, d.id, hard_flag === 'true')
+          }
         }
-        console.log(this.by_difficulty)
       })
+    }
+  },
+  methods: {
+    itemClicked (item) {
+      if (!(item.id in this.hard_status)) {
+        this.$set(this.hard_status, item.id, false)
+      }
+      this.hard_status[item.id] = !this.hard_status[item.id]
+      localStorage.setItem(item.id, this.hard_status[item.id])
     }
   }
 }
@@ -104,8 +118,13 @@ export default {
     width: 200px;
     height: 70px;
     vertical-align: middle;
-    background-color: #f8f8f8;
     padding: 5px;
+  }
+  .hard {
+    background-color: rgb(255, 99, 71);
+  }
+  .non-hard {
+    background-color: #f8f8f8;
   }
   p {
     margin: auto;
