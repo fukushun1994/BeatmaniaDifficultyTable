@@ -1,6 +1,19 @@
 <template>
   <div class="main-page">
     <h1>☆11ハード難易度表</h1>
+    <import-modal
+      v-if="showImportModal"
+      @import="importData"
+      @close="showImportModal = false"
+    />
+    <export-modal
+      v-if="showExportModal"
+      @close="showExportModal = false"
+      :token="token"
+    />
+    <button @click="showImportModal = true">インポート</button>
+    <button @click="showExportModal = true">エクスポート</button>
+    <h4>{{hardCnt}} / {{masterData.length}} ハード済み</h4>
     <ul
       v-for="difficulty in difficulties"
       :key="difficulty"
@@ -8,26 +21,29 @@
       <li class="header">
         {{ difficulty }}
       </li>
-      <li v-for="item in by_difficulty[difficulty]"
+      <li v-for="item in byDifficulty[difficulty]"
         class="item"
         :key="item.id"
-        :class="[hard_status[item.id] ? 'hard' : 'non-hard']"
+        :class="[hardStatus[item.id] ? 'hard' : 'non-hard']"
         @click="itemClicked(item)"
       >
         <p>{{ item.name }}</p>
       </li>
     </ul>
+    <p>出典：<a href="https://www65.atwiki.jp/bemani2sp11/pages/12.html">☆11 (ハード難易度表)</a></p>
   </div>
 </template>
 
 <script>
+import ImportModal from './ImportModal.vue'
+import ExportModal from './ExportModal.vue'
 
 export default {
   name: 'MainPage',
   data () {
     return {
-      master_data: null,
-      by_difficulty: {},
+      masterData: null,
+      byDifficulty: {},
       difficulties: [
         '地力S+',
         '個人差S+',
@@ -44,8 +60,15 @@ export default {
         '地力F',
         '未定'
       ],
-      hard_status: {}
+      hardStatus: {},
+      hardCnt: 0,
+      showImportModal: false,
+      showExportModal: false
     }
+  },
+  components: {
+    'import-modal': ImportModal,
+    'export-modal': ExportModal
   },
   mounted () {
     var req = new XMLHttpRequest()
@@ -54,7 +77,6 @@ export default {
     req.onload = () => {
       const neatCsv = require('neat-csv')
       neatCsv(req.responseText).then((data) => {
-        this.master_data = data
         /*
         data = [
           {
@@ -68,16 +90,18 @@ export default {
             textage_2P: 'http://textage.cc/score/25/citynvrs.html?2AB00',
             version: '25'
           }
-        ]*/
-        
+        ]
+        */
+        this.masterData = data
         for (var d of data) {
-          if (!this.by_difficulty[d.difficulty]) {
-            this.$set(this.by_difficulty, d.difficulty, [])
+          if (!this.byDifficulty[d.difficulty]) {
+            this.$set(this.byDifficulty, d.difficulty, [])
           }
-          this.by_difficulty[d.difficulty].push(d)
-          let hard_flag = localStorage.getItem(d.id)
-          if (hard_flag != null) {
-            this.$set(this.hard_status, d.id, hard_flag === 'true')
+          this.byDifficulty[d.difficulty].push(d)
+          let hardFlag = localStorage.getItem(d.id)
+          this.$set(this.hardStatus, d.id, hardFlag === 'true')
+          if (hardFlag === 'true') {
+            this.hardCnt += 1
           }
         }
       })
@@ -85,11 +109,33 @@ export default {
   },
   methods: {
     itemClicked (item) {
-      if (!(item.id in this.hard_status)) {
-        this.$set(this.hard_status, item.id, false)
+      if (!(item.id in this.hardStatus)) {
+        this.$set(this.hardStatus, item.id, false)
       }
-      this.hard_status[item.id] = !this.hard_status[item.id]
-      localStorage.setItem(item.id, this.hard_status[item.id])
+      if (this.hardStatus[item.id]) {
+        this.hardCnt -= 1
+      } else {
+        this.hardCnt += 1
+      }
+      this.hardStatus[item.id] = !this.hardStatus[item.id]
+      localStorage.setItem(item.id, this.hardStatus[item.id])
+    },
+    importData (token) {
+      var jwt = require('jsonwebtoken')
+      try{
+        this.hardStatus = jwt.verify(token, 'jwt_key')
+        for (let key in this.hardStatus){
+          localStorage.setItem(key, this.hardStatus[key])
+        }
+      } catch(err) {
+        alert('文字列が正しくありません')
+      }
+    }
+  },
+  computed: {
+    token: function () {
+      var jwt = require('jsonwebtoken')
+      return jwt.sign(this.hardStatus, 'jwt_key')
     }
   }
 }
